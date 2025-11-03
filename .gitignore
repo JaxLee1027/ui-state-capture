@@ -1,0 +1,20 @@
+# .gitignore
+
+# Critical: Do not commit session secrets!
+*auth.json
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Anaconda / venv
+.venv/
+envs/
+.conda/
+
+# IDE settings
+.vscode/
+.idea/
+
+# Test outputs
+*.png

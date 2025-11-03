@@ -31,7 +31,7 @@ def test_saved_auth():
          return
 
     # --- NEW ERROR CHECK ---
-    if YOUR_ANCHOR_SELECTOR_HERE == '[data-testid="Inbox"]' and not os.path.exists(AUTH_FILE_PATH): # Only if it's default and auth not present
+    if YOUR_ANCHOR_SELECTOR_HERE == 'text="All issues"' and not os.path.exists(AUTH_FILE_PATH): # Only if it's default and auth not present
          print("="*50)
          print("WARNING: Please open 'test_auth.py' and verify/edit the")
          print("'YOUR_ANCHOR_SELECTOR_HERE' variable with a real selector.")

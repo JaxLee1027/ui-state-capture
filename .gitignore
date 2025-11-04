@@ -15,6 +15,3 @@ envs/
 # IDE settings
 .vscode/
 .idea/
-
-# Test outputs
-*.png

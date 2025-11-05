@@ -9,7 +9,77 @@ from playwright.sync_api import sync_playwright, Page
 from openai import OpenAI
 
 # --- Configuration ---
-AUTH_FILE_PATH = "linear_auth.json"
+# This dictionary maps domain keywords to their specific settings.
+# This is the core of our generalization strategy.
+SITE_CONFIGS = {
+    "trello": {
+        "auth_file": "trello_auth.json",
+        "anchor_selector": '[data-testid="head-container"]',
+        "default_goal": (
+            "Find the list named 'To Do'. Click the 'Add a card' button. "
+            "Type 'My First AI Trello Card' and click 'Add card'."
+        ),
+        "site_context_prompt": (
+            "We are on Trello. The primary items are called 'Cards' and 'Lists'."
+        )
+    },
+    "linear": {
+        "auth_file": "linear_auth.json",
+        "anchor_selector": 'text="Inbox"',
+        "default_goal": (
+            "Find the button to create a new issue and click it. "
+            "Then, type 'My First AI Issue' into the title field."
+        ),
+        "site_context_prompt": (
+            "We are on Linear. The primary items are called 'Issues' and 'Projects'."
+        )
+    },
+    "notion": {
+        "auth_file": "notion_auth.json",
+        "anchor_selector": 'text="Home"', # Waits for the sidebar to load
+        "default_goal": (
+            "Execute the following commands step by step."
+            "Find the 'Add New' button on the side bar and click it. And don't touch it again. "
+            "After that, in the new modal, click 'Projects' button. After that, click 'Continue' button."
+            "After that, click 'Done' button and don't click 'Add New' again. "
+            "End the loop as soon as you finish all these steps, do not repeat any steps"
+        ),
+        "site_context_prompt": (
+            "We are on Notion. The primary items are called 'Pages' and 'Databases'. "
+            "The main content area is often editable."
+        )
+    }
+    # We can add more sites here (e.g., "github", "jira")
+}
+
+# Function to detect and retrieve site-specific config
+def get_site_config(url: str) -> dict:
+    """
+    Detects the site based on the URL and returns the
+    corresponding configuration dictionary.
+    """
+    if "trello.com" in url:
+        print("Site detected: Trello")
+        return SITE_CONFIGS["trello"]
+    elif "linear.app" in url:
+        print("Site detected: Linear")
+        return SITE_CONFIGS["linear"]
+    elif "notion.so" in url:
+        print("Site detected: Notion")
+        return SITE_CONFIGS["notion"]
+    
+    # Fallback or error
+    print(f"Warning: No specific config found for URL: {url}")
+    print("Falling back to default behavior. This may fail.")
+    # We return a basic structure to avoid crashing, 
+    # but auth will likely fail.
+    return {
+        "auth_file": "default_auth.json",
+        "anchor_selector": "body", # A generic selector
+        "default_goal": "No default goal specified.",
+        "site_context_prompt": "We are on an unknown website."
+    }
+
 DATASET_DIR = "dataset"
 os.makedirs(DATASET_DIR, exist_ok=True)
 # ---------------------
@@ -28,7 +98,7 @@ except KeyError:
 def get_simplified_dom(page: Page) -> str:
     """
     (Observe)
-    [THE FINAL, FINAL FIX] This version adds a check for [role="menu"].
+    This version adds a check for [role="menu"].
     Our new focus hierarchy is:
     1. Try to find a [role="dialog"] (main modal).
     2. If no dialog, *then* try to find a [role="menu"] (popover menu).
@@ -181,7 +251,7 @@ def get_simplified_dom(page: Page) -> str:
         return ""
 
 
-def think(goal: str, dom: str, history: list) -> dict:
+def think(goal: str, dom: str, history: list, site_context: str) -> dict:
     """
     Think phase.
     Sends the current goal, DOM, and action history to the LLM
@@ -192,6 +262,9 @@ def think(goal: str, dom: str, history: list) -> dict:
 
     prompt = f"""
     We are an AI agent.
+    [SITE CONTEXT]
+    {site_context}
+
     Our high-level, multi-step goal is: "{goal}"
 
     This is our HISTORY of actions taken so far:
@@ -335,17 +408,24 @@ def act(page: Page, action: dict, task_dir: str, step: int) -> bool:
     return True
 
 
-def run_agent_loop(goal: str, task_name: str, workspace_url: str, anchor_selector: str):
+def run_agent_loop(
+    goal: str,
+    task_name: str,
+    workspace_url: str,
+    anchor_selector: str, 
+    config: dict
+):
     """
     Outer loop that coordinates Observe -> Think -> Act steps.
-    Loads a stored Linear session, navigates to the workspace,
-    and runs up to a fixed number of steps.
+    It now uses a dynamic config object to load the correct auth file and provide site context to the think phase.
     """
 
-    if not os.path.exists(AUTH_FILE_PATH):
+    auth_file = config["auth_file"]
+    if not os.path.exists(auth_file):
         print(
-            f"Error: auth file '{AUTH_FILE_PATH}' not found. "
-            f"Run the login script that creates this file before starting the agent."
+            # Use the dynamic auth_file variable in the error
+            f"Error: auth file '{auth_file}' not found. "
+            f"Please run the login script for this site first."
         )
         return
 
@@ -362,12 +442,15 @@ def run_agent_loop(goal: str, task_name: str, workspace_url: str, anchor_selecto
     with sync_playwright() as p:
         # slow_mo adds a small delay to each action, which helps with debugging
         browser = p.chromium.launch(headless=False, slow_mo=250)
-        context = browser.new_context(storage_state=AUTH_FILE_PATH)
+        context = browser.new_context(storage_state=auth_file)
         page = context.new_page()
 
         print(f"Navigating to workspace: {workspace_url}")
         page.goto(workspace_url)
-
+        print("Taking screenshot *immediately* after navigation...")
+        page.screenshot(
+            path=os.path.join(task_dir, "debug_01_post_navigation.png")
+        )
         try:
             print(
                 f"Waiting for dashboard to load (waiting for selector: {anchor_selector})..."
@@ -393,7 +476,8 @@ def run_agent_loop(goal: str, task_name: str, workspace_url: str, anchor_selecto
                     break
 
                 # 2. Think
-                action = think(goal, simplified_dom, action_history)
+                site_context = config["site_context_prompt"]
+                action = think(goal, simplified_dom, action_history, site_context)
 
                 # 3. Act
                 continue_loop = act(page, action, task_dir, step)
@@ -421,8 +505,40 @@ def run_agent_loop(goal: str, task_name: str, workspace_url: str, anchor_selecto
 
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
+            print("Dumping the page HTML to debug_page_content.html ...")
+            try:
+                html_content = page.content()
+                debug_html_path = os.path.join(task_dir, "debug_page_content.html")
+                with open(debug_html_path, "w", encoding="utf-8") as f:
+                    f.write(html_content)
+                print(f"HTML dump saved to: {debug_html_path}")
+            except Exception as e_html:
+                print(f"Could not dump HTML: {e_html}")
+            print("Running get_simplified_dom() at point of failure...")
+            try:
+                # We call the function manually
+                simplified_dom_at_failure = get_simplified_dom(page)
+                debug_dom_path = os.path.join(task_dir, "debug_simplified_dom.txt")
+                
+                with open(debug_dom_path, "w", encoding="utf-8") as f:
+                    f.write(simplified_dom_at_failure)
+                    
+                print(f"Simplified DOM saved to: {debug_dom_path}")
+                
+                # # Also print it to the console if it's not too long
+                # print("\n--- Simplified DOM at Failure ---")
+                # if simplified_dom_at_failure:
+                #     print(simplified_dom_at_failure)
+                # else:
+                #     print("[Simplified DOM was empty]")
+                # print("----------------------------------\n")
+                
+            except Exception as e_dom:
+                print(f"Could not get simplified DOM: {e_dom}")
             print("Capturing a screenshot of the critical error state...")
             page.screenshot(path=os.path.join(task_dir, "critical_error.png"))
+
+        print("Pausing for 5 seconds before closing the browser.")
 
         print("Pausing for 5 seconds before closing the browser.")
         page.wait_for_timeout(5000)
@@ -433,6 +549,7 @@ if __name__ == "__main__":
     """
     Entry point.
     Parses command-line arguments and starts the agent loop.
+    loads the correct config, and starts the agent loop.
     """
 
     parser = argparse.ArgumentParser(
@@ -443,38 +560,65 @@ if __name__ == "__main__":
         "--url",
         type=str,
         required=True,
-        help="Specific Linear workspace URL where the agent starts.",
+        help="Specific workspace URL (e.g., Trello, Linear) where the agent starts.",
     )
 
     parser.add_argument(
         "--selector",
         type=str,
-        default='text="Inbox"',
-        help="Stable anchor selector that indicates the dashboard is loaded.",
+        default=None, # Default is None, will be loaded from config
+        help="(Optional) Override the site's default anchor selector.",
     )
 
     parser.add_argument(
         "--goal",
         type=str,
-        default=(
-            "Find the button to create a new issue and click it. "
-            "Then, in the modal that opens, type 'My First AI Issue' into the title field."
-        ),
-        help="High-level task goal for the agent.",
+        default=None, # [MODIFIED] Default is None, will be loaded from config
+        help="(Optional) Override the site's default high-level task goal.",
     )
 
     parser.add_argument(
         "--task-name",
         type=str,
-        default="linear_create_issue_test_1",
+        default="agent_task_run_1", # [MODIFIED] A more generic default name
         help="Folder name inside ./dataset/ for storing screenshots.",
     )
 
     args = parser.parse_args()
 
+    # 1. Detect config from the *required* URL
+    config = get_site_config(args.url)
+    if not config:
+        print(f"Error: Could not determine configuration for URL {args.url}")
+        raise SystemExit(1)
+
+    # 2. Use config defaults if user did not provide overrides
+    
+    # If user did not provide --goal, use the site's default goal
+    if args.goal is None:
+        args.goal = config["default_goal"]
+        print(f"No --goal provided. Using default for this site:")
+        print(f"\"{args.goal}\"")
+    else:
+        print(f"Using user-provided --goal:")
+        print(f"\"{args.goal}\"")
+
+    # If user did not provide --selector, use the site's default selector
+    if args.selector is None:
+        args.selector = config["anchor_selector"]
+        print(f"No --selector provided. Using default for this site:")
+        print(f"\"{args.selector}\"")
+    else:
+        print(f"Using user-provided --selector:")
+        print(f"\"{args.selector}\"")
+    
+    # --- End of New Logic ---
+
+    # Pass the entire config object and the resolved anchor_selector
     run_agent_loop(
         goal=args.goal,
         task_name=args.task_name,
         workspace_url=args.url,
-        anchor_selector=args.selector,
+        anchor_selector=args.selector, 
+        config=config 
     )

@@ -284,20 +284,27 @@ def think(goal: str, dom: str, history: list, site_context: str) -> dict:
     4. Decide the single next logical step.
 
     CRITICAL RULES:
-    - Editable text fields appear as elements formatted like:
-    <TEXT-INPUT data-agent-id="..." label="..."></TEXT-INPUT>
-    - The "type" action must only be used on elements formatted as <TEXT-INPUT ...>.
-    - Never use the "type" action on elements formatted as <CHECKBOX ...> or on any BUTTON.
-    - When the goal mentions typing the issue title, and at least one <TEXT-INPUT ...> element exists,
-    the agent must choose a "type" action instead of "fail" or clicking "Create issue".
-    - If multiple <TEXT-INPUT ...> elements exist, prefer the one whose label contains words such as
-    "issue" or "title" (case-insensitive). If none match, choose the most reasonable text input
-    near the center of the modal.
-    - If no <TEXT-INPUT ...> element is present yet, but there are clickable elements that may reveal
-    such an input (for example a button that opens a form), the agent should click one of them
-    instead of returning "fail".
-    - The "fail" action is a last resort when there is truly no reasonable clickable element and
-    no text input that can progress the goal.
+    - We are an AI agent. Our GOAL is a multi-step plan.
+    - Our HISTORY shows what we *just completed*.
+    - Our DOM is what is visible *right now*.
+
+    - **[PRIORITY 1: HISTORY]** ALWAYS check the HISTORY first.
+    - If the GOAL is "Step 1: A, Step 2: B" and HISTORY shows "Clicked A",
+      our *only job* is to find "B" in the current DOM.
+    - NEVER repeat a step from the GOAL that is already in the HISTORY,
+      even if the element (like "A") is still visible.
+    - Prioritize the *next uncompleted step* of the GOAL.
+
+    - **[PRIORITY 2: ACTIONS]**
+    - Editable text fields appear as <TEXT-INPUT ...>.
+    - If the goal is to type into a <TEXT-INPUT>, the ONLY action MUST be "type".
+    - NEVER, under any circumstances, issue a "click" action on a <TEXT-INPUT> element.
+    - The "type" action is only for <TEXT-INPUT>. Never "type" on a <BUTTON> or <CHECKBOX>.
+
+    - **[PRIORITY 3: FAILURE]**
+    - "fail" is a last resort. If the DOM is empty or no elements match the
+      *next* step of the GOAL, wait and observe again. Only fail if
+      progress is impossible.
 
     Valid actions (respond only with JSON, no extra text):
 
@@ -467,7 +474,7 @@ def run_agent_loop(
 
                 # Allow the UI to settle before observing
                 print("Waiting for UI to settle...")
-                page.wait_for_timeout(1000)
+                page.wait_for_timeout(3000)
 
                 # 1. Observe
                 simplified_dom = get_simplified_dom(page)
@@ -537,8 +544,6 @@ def run_agent_loop(
                 print(f"Could not get simplified DOM: {e_dom}")
             print("Capturing a screenshot of the critical error state...")
             page.screenshot(path=os.path.join(task_dir, "critical_error.png"))
-
-        print("Pausing for 5 seconds before closing the browser.")
 
         print("Pausing for 5 seconds before closing the browser.")
         page.wait_for_timeout(5000)

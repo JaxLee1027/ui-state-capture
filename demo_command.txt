@@ -1,18 +1,11 @@
 1. Create a issue in Linear
-python agent.py --url "https://linear.app/jiayang-li/team/JIA/active" --goal "Find the button to create a new issue and click it. Then, in the modal that opens, type 'Softlight' into the 'Issue Title' field, and type 'Softlight is the best' into the 'Add description...' field. Finally, click the 'Create issue' button to submit the form. When the issue is created, end the loop immediately" --task-name "Linear - Create issue"
+python agent.py --url "https://linear.app/jiayang-li/team/JIA/active" --goal "First, find the button to create a new issue and click it. Second, in the modal that opens, type 'Softlight' into the 'Issue Title' field。 Third, type 'Softlight is the best' into the 'Add description...' field. Fourth, click the 'Create issue' button to submit the form. Fifth, end the loop" --task-name "Linear - Create issue"
 
 2. Delete a issue in Linear
-python agent.py --url "https://linear.app/jiayang-li/team/JIA/active" --goal "Find the issue named 'Softlight', click on it, find the 'Delete' option in the '...', click on it, confirm the deletion, then end the loop immediately" --task-name "Linear - Delete issue"   
+python agent.py --url "https://linear.app/jiayang-li/team/JIA/active" --goal "First, click on 'Softlight'. Second, click the button with the text 'Issue options'. Third, click on 'Delete'. Fourth, in the popped-up modal, find and click on 'Delete'. Fifth, end the loop" --task-name "Linear - Delete issue"   
 
 3. Create a project in Notion
-python agent.py --url "https://www.notion.so/bc4556c746ea4546862737859864d264" --goal "First, find and click 'Add New'. Second, on the new modal, find and click 'Projects'. Third, find and click 'Continue'. Fourth, find and click 'Done' and then finish the task." --task-name "Notion - Create projects"
+python agent.py --url "https://www.notion.so/bc4556c746ea4546862737859864d264" --goal "First, find and click 'Add New'. Second, on the new modal, find and click 'Projects'. Third, find and click 'Continue'. Fourth, find and click 'Done'. Fifth, end the loop" --task-name "Notion - Create projects"
 
-4. Delete a project in Notion
-python agent.py --url "https://www.notion.so/bc4556c746ea4546862737859864d264"  --goal "First, look in the sidebar on the left. Find the element with the text 'Projects' and click it to open the page. Second, next, look in its left, find the button with the '...' (three dots) icon and click it. Third, in the menu that opens, find the element with the text 'Move to Trash' and click it. Then in the new model, click 'Delete'." --task-name "Notion - Delete projects"
-
-5. Change name in Notion
-python agent.py --url "https://www.notion.so/bc4556c746ea4546862737859864d264"  --goal "This is a step-by-step task. First, look in the sidebar on the left. Find the element with the text 'Settings' and click it to open the page. Second, find the button with the exact text 'General' and click it. Third, type 'Softlight' into 'Name' text input field. Fourth, click 'Update' button. Then end the task immediately" --task-name "Notion - Change Name"
-
-python agent.py --url "https://www.notion.so/bc4556c746ea4546862737859864d264"  --goal "This is a step-by-step task. First, look in the sidebar on the left. Find the element with the text 'Meetings' and click it to open the page. Second, find the button with the exact text 'New' that is located in the main content area, next to the 'At meeting notes' heading, and click it. Second, after clicking 'New', a new editable meeting entry will appear. Find the 'Meeting' text input field and type 'My First AI Meeting' into it. Then end the task immediately" --task-name "Notion - Create meeting"
-
-python agent.py --url "https://www.notion.so/bc4556c746ea4546862737859864d264"  --goal "This is a step-by-step task. First, look in the sidebar on the left. Find the element with the text 'Settings' and click it to open the page. Second, find the button with the exact text 'General' and click it. Third, type 'Softlight' into 'Name' text input field. Fourth, click 'Update' button. Then end the task immediately" --task-name "Notion - Change Name"
+4. Change name in Notion
+python agent.py --url "https://www.notion.so/bc4556c746ea4546862737859864d264"  --goal "This is a step-by-step task. First, look in the sidebar on the left. Find the element with the text 'Settings' and click it to open the page. Second, find the button with the exact text 'General' and click it. Third, type 'Softlight' into 'Name' text input field. Fourth, click 'Update' button. Fifth, end the loop" --task-name "Notion - Change Name"
